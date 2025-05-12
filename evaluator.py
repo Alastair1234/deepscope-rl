@@ -603,69 +603,128 @@ class GUIEvaluator(RewardEvaluator):
             # print(f"Warning: Unexpected shape for reward_scores in GUIEvaluator.get_reward_breakdown: {reward_scores.shape}")
             return {'xml_format': 0.0, 'click_hit': 0.0, 'distance_to_center': 0.0}
 
-# -----------------------------------------------------------------
-# NEW ►  UltrasoundEvaluator
-# -----------------------------------------------------------------
 class UltrasoundEvaluator(RewardEvaluator):
     """
     Reward components
     -----------------
-    0. Numeric accuracy  (+3 ➜ –3)  – mean absolute error of 6 floats
-    1. Keyword bonus     (+0.5)     – if slide/roll/fan/rotate/tilt present
-    2. XML / JSON format (+0.5)
+    0. Translation (+3 ➜ –3)  – Euclidean Δ x y z   (≤ T_MAX → +3, ≥ 2·T_MAX → –3)
+    1. Rotation     (+3 ➜ –3)  – shortest-angle error (deg)      (≤ R_MAX → +3, ≥ 2·R_MAX → –3)
+    2. Keyword      (+0.5)     – if slide / roll / fan / rotate / tilt appears in <reasoning>
+    3. XML / JSON   (+0.5)     – exact wrapper & valid JSON
     """
-    KW = {"slide","roll","fan","rotate","tilt"}
+    KW  = {"slide","roll","fan","rotate","tilt"}
+    T_MAX = 0.05            # 5 cm (scene units → metres)
+    R_MAX = 90.0            # reward saturates after 90 deg
 
-    num_reward_functions = 3
-    # JSON blob pattern – very forgiving (6 floats in order)
-    _float = r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?"
+    num_reward_functions = 4
+
+    _float   = r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?"
     trans_re = re.compile(
-        rf'position".*?"x":\s*({_float}).*?"y":\s*({_float}).*?"z":\s*({_float}).*?'
-        rf'rotation".*?"x":\s*({_float}).*?"y":\s*({_float}).*?"z":\s*({_float})',
-        re.DOTALL
-    )
-    xml_re = re.compile(
+        rf'"position"\s*:\s*\{{[^}}]*"x"\s*:\s*({_float})[^}}]*"y"\s*:\s*({_float})[^}}]*"z"\s*:\s*({_float})[^}}]*\}}'
+        rf'.*?"rotation"\s*:\s*\{{[^}}]*"x"\s*:\s*({_float})[^}}]*"y"\s*:\s*({_float})[^}}]*"z"\s*:\s*({_float})',
+        re.DOTALL)
+    xml_re   = re.compile(
         r"^<reasoning>\n.*?\n</reasoning>\n<answer>\n\{.*?\}\n</answer>\n?$",
-        re.DOTALL
-    )
+        re.DOTALL)
 
-    def _extract(self, text:str):
-        m = self.trans_re.search(text)
+    # ---------- helpers -----------------------------------------------------
+
+    @staticmethod
+    def _angle_diff(a:float, b:float)->float:
+        """Shortest signed difference of two angles in degrees."""
+        d = (a - b + 180.0) % 360.0 - 180.0
+        return abs(d)
+
+    @classmethod
+    def _rot_error(cls, p_xyz, t_xyz)->float:
+        """Quaternion-aware rotation error (deg)."""
+        # Convert to radians and quaternions
+        def quat(rx,ry,rz):
+            rx,ry,rz = np.deg2rad([rx,ry,rz])
+            # intrinsic XYZ – same order Unity uses for PLAX demo dataset
+            cx, sx = math.cos(rx/2), math.sin(rx/2)
+            cy, sy = math.cos(ry/2), math.sin(ry/2)
+            cz, sz = math.cos(rz/2), math.sin(rz/2)
+            # XYZ → quaternion
+            qw = cx*cy*cz - sx*sy*sz
+            qx = sx*cy*cz + cx*sy*sz
+            qy = cx*sy*cz - sx*cy*sz
+            qz = cx*cy*sz + sx*sy*cz
+            return np.array([qw,qx,qy,qz])
+        qp = quat(*p_xyz)
+        qt = quat(*t_xyz)
+        # angle = 2*acos(|q·q'|)
+        angle = 2.0*math.degrees(math.acos(min(1.0, abs(np.dot(qp,qt)))))
+        return angle
+
+    # ---------- main API ----------------------------------------------------
+
+    def _extract(self, txt:str):
+        m = self.trans_re.search(txt)
         if not m: return None
-        return [float(g) for g in m.groups()]  # 6-vector
+        vals = list(map(float, m.groups()))
+        return vals[:3], vals[3:]   # (pos, rot)
 
-    # --------------------------------------------------------------
     def compute_rewards(self, prompts, completions, answers, device):
         texts   = [c[0]["content"] for c in completions]
         preds   = [self._extract(t) for t in texts]
         truths  = [self._extract(a) for a in answers]
 
-        num_reward, abs_errs = [], []
-        for p,t in zip(preds, truths):
-            if p is None or t is None:
-                num_reward.append(-3.0); abs_errs.append(float("inf")); continue
-            mae = sum(abs(pi-ti) for pi,ti in zip(p,t)) / 6.0
-            abs_errs.append(mae)
-            # scale 0->+3, 6->0, 12->-3  (feel free to tweak)
-            scaled = 3.0 - mae       # 1 unit MAE = –1 reward step
-            scaled = max(-3.0, min(3.0, scaled))
-            num_reward.append(scaled)
+        rewards = []
+        trans_errs, rot_errs = [], []
 
-        kw_reward  = [0.5 if any(re.search(rf"\b{k}\b", txt, re.I) for k in self.KW) else 0.0 for txt in texts]
-        xml_reward = [0.5 if self.xml_re.match(txt) else 0.0 for txt in texts]
+        for pr, gt in zip(preds, truths):
+            # default: worst reward
+            trans_r = rot_r = -3.0
+            t_err = r_err = float("inf")
 
-        comp = list(zip(num_reward, kw_reward, xml_reward))
-        rewards = torch.tensor(comp, dtype=torch.float32, device=device)
+            if pr and gt:
+                p_pos, p_rot = pr
+                g_pos, g_rot = gt
+
+                # --- translation ------------------------------------------------
+                t_err = np.linalg.norm(np.subtract(p_pos, g_pos))
+                if t_err <= self.T_MAX:
+                    trans_r = 3.0
+                elif t_err >= 2*self.T_MAX:
+                    trans_r = -3.0
+                else:
+                    trans_r = 3.0 - 6.0*(t_err - self.T_MAX)/self.T_MAX  # linear fall-off
+
+                # --- rotation ---------------------------------------------------
+                r_err = self._rot_error(p_rot, g_rot)
+                if r_err <= self.R_MAX:
+                    rot_r = 3.0
+                elif r_err >= 2*self.R_MAX:
+                    rot_r = -3.0
+                else:
+                    rot_r = 3.0 - 6.0*(r_err - self.R_MAX)/self.R_MAX
+
+            kw_bonus  = 0.5 if any(re.search(rf"\b{k}\b", texts[len(rewards)], re.I) for k in self.KW) else 0.0
+            xml_bonus = 0.5 if self.xml_re.match(texts[len(rewards)]) else 0.0
+
+            rewards.append([trans_r, rot_r, kw_bonus, xml_bonus])
+            trans_errs.append(t_err)
+            rot_errs.append(r_err)
+
+        R = torch.tensor(rewards, dtype=torch.float32, device=device)
 
         metrics = {
-            "rewards/numeric":  rewards[:,0].mean().item(),
-            "rewards/keywords": rewards[:,1].mean().item(),
-            "rewards/xml":      rewards[:,2].mean().item(),
-            "reward":           rewards.sum(1).mean().item(),
-            "metrics/mae":      float(sum(abs_errs)/len(abs_errs)),
+            "rewards/translation":  R[:,0].mean().item(),
+            "rewards/rotation":     R[:,1].mean().item(),
+            "rewards/keywords":     R[:,2].mean().item(),
+            "rewards/xml":          R[:,3].mean().item(),
+            "reward":               R.sum(1).mean().item(),
+            "metrics/mean_trans_err_m": float(np.mean(trans_errs)),
+            "metrics/mean_rot_err_deg": float(np.mean(rot_errs)),
         }
-        return rewards, metrics
+        return R, metrics
 
     def get_reward_breakdown(self, r:torch.Tensor):
         if r.ndim==2: r=r[0]
-        return {"numeric":r[0].item(),"keywords":r[1].item(),"xml":r[2].item()}
+        return {
+            "translation": r[0].item(),
+            "rotation":    r[1].item(),
+            "keywords":    r[2].item(),
+            "xml":         r[3].item(),
+        }
