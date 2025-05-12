@@ -89,9 +89,10 @@ def get_evaluator(name: str) -> RewardEvaluator:
         return CorrelationEvaluator()
     elif name.lower() == "gui":
         return GUIEvaluator()
+    elif name.lower()=="ultrasound":   
+        return UltrasoundEvaluator()
     else:
         raise NotImplementedError(f"No evaluator implemented for {name}. Supported: 'clock', 'correlation', 'gui'")
-
 
 class ClockEvaluator(RewardEvaluator):
     """
@@ -601,3 +602,70 @@ class GUIEvaluator(RewardEvaluator):
         else:
             # print(f"Warning: Unexpected shape for reward_scores in GUIEvaluator.get_reward_breakdown: {reward_scores.shape}")
             return {'xml_format': 0.0, 'click_hit': 0.0, 'distance_to_center': 0.0}
+
+# -----------------------------------------------------------------
+# NEW ►  UltrasoundEvaluator
+# -----------------------------------------------------------------
+class UltrasoundEvaluator(RewardEvaluator):
+    """
+    Reward components
+    -----------------
+    0. Numeric accuracy  (+3 ➜ –3)  – mean absolute error of 6 floats
+    1. Keyword bonus     (+0.5)     – if slide/roll/fan/rotate/tilt present
+    2. XML / JSON format (+0.5)
+    """
+    KW = {"slide","roll","fan","rotate","tilt"}
+
+    num_reward_functions = 3
+    # JSON blob pattern – very forgiving (6 floats in order)
+    _float = r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?"
+    trans_re = re.compile(
+        rf'position".*?"x":\s*({_float}).*?"y":\s*({_float}).*?"z":\s*({_float}).*?'
+        rf'rotation".*?"x":\s*({_float}).*?"y":\s*({_float}).*?"z":\s*({_float})',
+        re.DOTALL
+    )
+    xml_re = re.compile(
+        r"^<reasoning>\n.*?\n</reasoning>\n<answer>\n\{.*?\}\n</answer>\n?$",
+        re.DOTALL
+    )
+
+    def _extract(self, text:str):
+        m = self.trans_re.search(text)
+        if not m: return None
+        return [float(g) for g in m.groups()]  # 6-vector
+
+    # --------------------------------------------------------------
+    def compute_rewards(self, prompts, completions, answers, device):
+        texts   = [c[0]["content"] for c in completions]
+        preds   = [self._extract(t) for t in texts]
+        truths  = [self._extract(a) for a in answers]
+
+        num_reward, abs_errs = [], []
+        for p,t in zip(preds, truths):
+            if p is None or t is None:
+                num_reward.append(-3.0); abs_errs.append(float("inf")); continue
+            mae = sum(abs(pi-ti) for pi,ti in zip(p,t)) / 6.0
+            abs_errs.append(mae)
+            # scale 0->+3, 6->0, 12->-3  (feel free to tweak)
+            scaled = 3.0 - mae       # 1 unit MAE = –1 reward step
+            scaled = max(-3.0, min(3.0, scaled))
+            num_reward.append(scaled)
+
+        kw_reward  = [0.5 if any(re.search(rf"\b{k}\b", txt, re.I) for k in self.KW) else 0.0 for txt in texts]
+        xml_reward = [0.5 if self.xml_re.match(txt) else 0.0 for txt in texts]
+
+        comp = list(zip(num_reward, kw_reward, xml_reward))
+        rewards = torch.tensor(comp, dtype=torch.float32, device=device)
+
+        metrics = {
+            "rewards/numeric":  rewards[:,0].mean().item(),
+            "rewards/keywords": rewards[:,1].mean().item(),
+            "rewards/xml":      rewards[:,2].mean().item(),
+            "reward":           rewards.sum(1).mean().item(),
+            "metrics/mae":      float(sum(abs_errs)/len(abs_errs)),
+        }
+        return rewards, metrics
+
+    def get_reward_breakdown(self, r:torch.Tensor):
+        if r.ndim==2: r=r[0]
+        return {"numeric":r[0].item(),"keywords":r[1].item(),"xml":r[2].item()}

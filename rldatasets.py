@@ -1,7 +1,7 @@
 """
 Data loader for generating analog clock images and times.
 """
-
+import json
 import random
 import os
 from typing import Tuple, Any, Dict
@@ -297,6 +297,89 @@ class GUIDataLoader(DataLoader):
     def reset(self):
         self.current_index = 0
 
+# --------------------------------------------------------------------
+# 2 .  NEW ►  UltrasoundDataLoader
+# --------------------------------------------------------------------
+ULTRA_PROMPT = """
+You will be shown a freeze-frame from a point-of-care ultrasound scan.
+Return a JSON blob giving the **probe transform** that produces an optimal
+parasternal long-axis (PLAX) view.
+
+Respond **exactly** like this:
+
+<reasoning>
+(one short sentence – feel free to mention slide / roll / fan / rotate / tilt)
+</reasoning>
+<answer>
+{"position":{"x":XX,"y":YY,"z":ZZ},"rotation":{"x":RX,"y":RY,"z":RZ}}
+</answer>
+
+Do not put any other text after </answer>.
+"""
+
+class UltrasoundDataLoader(DataLoader):
+    """
+    Reads `LLMCapture` JSON file produced by the Unity plug-in.
+    Each entry:
+        {
+          "id":"42",
+          "image":"42.jpg",
+          "conversations":[
+              {"from":"human","value":"… prompt …"},
+              {"from":"gpt","value":"{...position...,rotation...}"}
+          ]
+        }
+    """
+
+    def __init__(
+        self,
+        root_dir: str,
+        file_name: str = "LLMCapture",
+        dataset_size: int | None = None,
+        is_train: bool = True,
+        random_order: bool = True,
+    ):
+        super().__init__(random=random_order)
+        self.root_dir = root_dir
+        self.is_train = is_train
+
+        j_path = os.path.join(root_dir, file_name)
+        with open(j_path, "r") as f:
+            data = json.load(f)["LLMDatasets"]
+
+        if dataset_size is not None:
+            data = data[:dataset_size]
+
+        self.records: List[Dict[str, Any]] = data
+        if random_order: random.shuffle(self.records)
+
+        self.current_index = 0
+        # the human prompt is identical for all examples in your sample
+        # but keep it per-item in case you add variants later
+        self.prompt_template = ULTRA_PROMPT
+
+    # -- iterable protocol ----------------------------------------------------
+    def __len__(self): return len(self.records)
+    def __iter__(self): self.current_index = 0; return self
+    def reset(self):     self.current_index = 0
+
+    # -------------------------------------------------------------------------
+    def __next__(self) -> Tuple[str, str]:
+        if self.current_index >= len(self.records):
+            raise StopIteration
+        rec = self.records[self.current_index]
+        self.current_index += 1
+
+        img_path = os.path.join(self.root_dir, rec["image"])
+        ground_truth_json = rec["conversations"][1]["value"]  # GPT answer
+
+        # Optional: use the original human string; otherwise the generic template
+        
+        self.prompt = ULTRA_PROMPT
+
+        return img_path, ground_truth_json  # <image> , <answer string>
+# --------------------------------------------------------------------
+
 
 # --- Factory Function --- 
 
@@ -332,6 +415,13 @@ def get_dataloaders(dataset_name: str, **kwargs) -> Tuple[DataLoader, DataLoader
         trainloader = CorrelationScatterDataLoader(dataset_size=dataset_size * 100, is_train=True)
         testloader = CorrelationScatterDataLoader(dataset_size=dataset_size, is_train=False)
         return trainloader, testloader
+    elif dataset_name == "ultrasound":
+        root_dir           = kwargs["root_dir"]
+        dataset_size       = kwargs.get("dataset_size")  # optional slice
+        # tiny split for local tinkering — change later on GPUs
+        train_loader = UltrasoundDataLoader(root_dir, dataset_size=dataset_size, is_train=True)
+        test_loader  = UltrasoundDataLoader(root_dir, dataset_size=20, is_train=False, random_order=False)
+        return train_loader, test_loader
     elif dataset_name == 'gui':
         trainloader = GUIDataLoader(dataset_size=dataset_size * 100, is_train=True, 
                                   image_width=image_width, image_height=image_height, 

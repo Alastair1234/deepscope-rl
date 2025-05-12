@@ -484,7 +484,8 @@ def parse_args():
     
     # Model configuration
     parser.add_argument("--model_name_or_path", type=str, default="Qwen/Qwen2.5-VL-7B-Instruct", help="Model identifier for main and base model")
-    parser.add_argument("--dataset_type", type=str, default="clock", choices=["clock", "correlation", "gui"], help="Type of dataset to use ('clock', 'correlation', or 'gui')")
+    parser.add_argument("--dataset_type", type=str, default="clock", choices=["clock", "ultrasound", "correlation", "gui"], help="Type of dataset to use ('clock', 'correlation', or 'gui')")
+    parser.add_argument("--root_dir", type=str, default=".", help="Folder with LLMCapture & images")
 
     # Output and logging
     parser.add_argument("--output_dir", type=str, default="output", help="Directory to save outputs")
@@ -533,7 +534,7 @@ if __name__ == "__main__":
     base_model, _ = llms.get_llm_tokenizer(args.model_name_or_path, device)
 
     print(f"Loading dataset: {args.dataset_type}")
-    train_loader, test_loader = rldatasets.get_dataloaders(args.dataset_type)
+    train_loader, test_loader = rldatasets.get_dataloaders(args.dataset_type, root_dir=args.root_dir)
 
     print(f"Loading evaluator for: {args.dataset_type}")
     eval_class = evaluator.get_evaluator(args.dataset_type)
