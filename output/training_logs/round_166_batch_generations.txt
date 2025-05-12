@@ -1,0 +1,210 @@
+{
+  "prompt": {
+    "text": "\nYou will be shown a freeze-frame from a point-of-care ultrasound scan.\nReturn a JSON blob giving the **probe transform** that produces an optimal\nparasternal long-axis (PLAX) view.\n\nRespond **exactly** like this:\n\n<reasoning>\n(one short sentence \u2013 feel free to mention slide / roll / fan / rotate / tilt)\n</reasoning>\n<answer>\n{\"position\":{\"x\":XX,\"y\":YY,\"z\":ZZ},\"rotation\":{\"x\":RX,\"y\":RY,\"z\":RZ}}\n</answer>\n\nDo not put any other text after </answer>.\n",
+    "answer": "{\"position\":{\"x\":-0.12805016338825227,\"y\":-0.012533619999885559,\"z\":-0.015757590532302858},\"rotation\":{\"x\":72.0,\"y\":-130.0,\"z\":-60.0}}",
+    "image_path": "./LLM2/576.jpg"
+  },
+  "generations": [
+    {
+      "response": "<reasoning>\nRotate probe 90 degrees to view parasternal long-axis.\n</reasoning>\n<answer>\n{\"position\":{\"x\":-450,\"y\":0,\"z\":0},\"rotation\":{\"x\":0,\"y\":90,\"z\":0}}\n</answer>",
+      "scores": {
+        "numeric": -3.0,
+        "keywords": 0.5,
+        "xml": 0.5,
+        "total_reward": -2.0
+      }
+    },
+    {
+      "response": "<reasoning>\nSlide to the left, tilt slightly upward, and rotate the probe counterclockwise.\n</reasoning>\n<answer>\n{\"position\":{\"x\":-20,\"y\":-10,\"z\":0},\"rotation\":{\"x\":0,\"y\":20,\"z\":-30}}\n</answer>",
+      "scores": {
+        "numeric": -3.0,
+        "keywords": 0.5,
+        "xml": 0.5,
+        "total_reward": -2.0
+      }
+    },
+    {
+      "response": "<reasoning>\nSlide the probe further up and rotate clockwise slightly.\n</reasoning>\n<answer>\n{\"position\":{\"x\":0.3,\"y\":0.4,\"z\":0.5},\"rotation\":{\"x\":15,\"y\":-5,\"z\":-10}}\n</answer>",
+      "scores": {
+        "numeric": -3.0,
+        "keywords": 0.5,
+        "xml": 0.5,
+        "total_reward": -2.0
+      }
+    },
+    {
+      "response": "<reasoning>\nSlide down and rotate the probe to the right.\n</reasoning>\n<answer>\n{\"position\":{\"x\":0,\"y\":-10,\"z\":0},\"rotation\":{\"x\":0,\"y\":90,\"z\":0}}\n</answer>",
+      "scores": {
+        "numeric": -3.0,
+        "keywords": 0.5,
+        "xml": 0.5,
+        "total_reward": -2.0
+      }
+    },
+    {
+      "response": "<reasoning>\nSlide the probe up and down to center the heart in view.\n</reasoning>\n<answer>\n{\"position\":{\"x\":-50,\"y\":10,\"z\":0},\"rotation\":{\"x\":0,\"y\":0,\"z\":0}}\n</answer>",
+      "scores": {
+        "numeric": -3.0,
+        "keywords": 0.5,
+        "xml": 0.5,
+        "total_reward": -2.0
+      }
+    },
+    {
+      "response": "<reasoning>\nRotate the probe 90 degrees to the right.\n</reasoning>\n<answer>\n{\"position\":{\"x\":-3.5,\"y\":12,\"z\":3.5},\"rotation\":{\"x\":0,\"y\":90,\"z\":0}}\n</answer>",
+      "scores": {
+        "numeric": -3.0,
+        "keywords": 0.5,
+        "xml": 0.5,
+        "total_reward": -2.0
+      }
+    },
+    {
+      "response": "<reasoning>\nSlide probe to the right, tilt slightly inferior.\n</reasoning>\n<answer>\n{\"position\":{\"x\":-0.3,\"y\":0.0,\"z\":0.0},\"rotation\":{\"x\":0.0,\"y\":0.0,\"z\":55.0}}\n</answer>",
+      "scores": {
+        "numeric": -3.0,
+        "keywords": 0.5,
+        "xml": 0.5,
+        "total_reward": -2.0
+      }
+    },
+    {
+      "response": "<reasoning>\nSlide the probe slightly laterally and rotate slightly counterclockwise.\n</reasoning>\n<answer>\n{\"position\":{\"x\":1,\"y\":0,\"z\":0},\"rotation\":{\"x\":0,\"y\":-1,\"z\":0}}\n</answer>",
+      "scores": {
+        "numeric": -3.0,
+        "keywords": 0.5,
+        "xml": 0.5,
+        "total_reward": -2.0
+      }
+    },
+    {
+      "response": "<reasoning>\nFan the probe slightly to the right to get an optimal PLAX view.\n</reasoning>\n<answer>\n{\"position\":{\"x\":-10,\"y\":0,\"z\":0},\"rotation\":{\"x\":0,\"y\":0,\"z\":50}}\n</answer>",
+      "scores": {
+        "numeric": -3.0,
+        "keywords": 0.5,
+        "xml": 0.5,
+        "total_reward": -2.0
+      }
+    },
+    {
+      "response": "<reasoning>\nSlide the probe slightly towards the left side and tilt it down.\n</reasoning>\n<answer>\n{\"position\":{\"x\":-30,\"y\":0,\"z\":0},\"rotation\":{\"x\":0,\"y\":-90,\"z\":0}}\n</answer>",
+      "scores": {
+        "numeric": -3.0,
+        "keywords": 0.5,
+        "xml": 0.5,
+        "total_reward": -2.0
+      }
+    },
+    {
+      "response": "<reasoning>\nSlide the probe up and roll it slightly towards the right side of the patient's thorax.\n</reasoning>\n<answer>\n{\"position\":{\"x\":0.25,\"y\":0.3,\"z\":-0.15},\"rotation\":{\"x\":0,\"y\":15,\"z\":0}}\n</answer>",
+      "scores": {
+        "numeric": -3.0,
+        "keywords": 0.5,
+        "xml": 0.5,
+        "total_reward": -2.0
+      }
+    },
+    {
+      "response": "<reasoning>\nSlide left and tilt slightly upward.\n</reasoning>\n<answer>\n{\"position\":{\"x\":-20,\"y\":0,\"z\":0},\"rotation\":{\"x\":30,\"y\":0,\"z\":0}}\n</answer>",
+      "scores": {
+        "numeric": -3.0,
+        "keywords": 0.5,
+        "xml": 0.5,
+        "total_reward": -2.0
+      }
+    },
+    {
+      "response": "<reasoning>\nSlide probe right and rotate slightly to the left.\n</reasoning>\n<answer>\n{\"position\":{\"x\":0.2,\"y\":0.1,\"z\":0.05},\"rotation\":{\"x\":0.1,\"y\":0.2,\"z\":0.1}}\n</answer>",
+      "scores": {
+        "numeric": -3.0,
+        "keywords": 0.5,
+        "xml": 0.5,
+        "total_reward": -2.0
+      }
+    },
+    {
+      "response": "<reasoning>\nSlide the probe slightly to the right while keeping it parallel to your chest.\n</reasoning>\n<answer>\n{\"position\":{\"x\":5,\"y\":-20,\"z\":0},\"rotation\":{\"x\":0,\"y\":0,\"z\":0}}\n</answer>",
+      "scores": {
+        "numeric": -3.0,
+        "keywords": 0.5,
+        "xml": 0.5,
+        "total_reward": -2.0
+      }
+    },
+    {
+      "response": "<reasoning>\nslide the probe up and tilt back slightly.\n</reasoning>\n<answer>\n{\"position\":{\"x\":10,\"y\":15,\"z\":5},\"rotation\":{\"x\":0,\"y\":0,\"z\":-30}}\n</answer>",
+      "scores": {
+        "numeric": -3.0,
+        "keywords": 0.5,
+        "xml": 0.5,
+        "total_reward": -2.0
+      }
+    },
+    {
+      "response": "<reasoning>\nSlide probe superiorly and rotate slightly to the left.\n</reasoning>\n<answer>\n{\"position\":{\"x\":-20,\"y\":20,\"z\":0},\"rotation\":{\"x\":0,\"y\":-30,\"z\":0}}\n</answer>",
+      "scores": {
+        "numeric": -3.0,
+        "keywords": 0.5,
+        "xml": 0.5,
+        "total_reward": -2.0
+      }
+    }
+  ],
+  "summary_stats": {
+    "mean_rewards_per_group": [
+      -2.0,
+      -2.0,
+      -2.0,
+      -2.0,
+      -2.0,
+      -2.0,
+      -2.0,
+      -2.0,
+      -2.0,
+      -2.0,
+      -2.0,
+      -2.0,
+      -2.0,
+      -2.0,
+      -2.0,
+      -2.0
+    ],
+    "std_rewards_per_group": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "advantages": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ]
+  }
+}
+---

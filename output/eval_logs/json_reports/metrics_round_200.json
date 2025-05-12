@@ -1,0 +1,15 @@
+{
+    "avg_scores": {
+        "avg_overall_rewards/numeric": -2.9545435339212416,
+        "avg_overall_rewards/keywords": 0.5,
+        "avg_overall_rewards/xml": 0.5,
+        "avg_overall_reward": -1.9545435339212418,
+        "avg_overall_metrics/mae": 23.411061401555692,
+        "avg_normal_rewards/numeric": -2.9545435339212416,
+        "avg_normal_rewards/keywords": 0.5,
+        "avg_normal_rewards/xml": 0.5,
+        "avg_normal_reward": -1.9545435339212418,
+        "avg_normal_metrics/mae": 23.411061401555692
+    },
+    "main_error_metric_value": -1.9545435339212418
+}

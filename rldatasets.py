@@ -342,6 +342,7 @@ class UltrasoundDataLoader(DataLoader):
         super().__init__(random=random_order)
         self.root_dir = root_dir
         self.is_train = is_train
+        self.prompt = ULTRA_PROMPT
 
         j_path = os.path.join(root_dir, file_name)
         with open(j_path, "r") as f:
@@ -356,8 +357,7 @@ class UltrasoundDataLoader(DataLoader):
         self.current_index = 0
         # the human prompt is identical for all examples in your sample
         # but keep it per-item in case you add variants later
-        self.prompt_template = ULTRA_PROMPT
-
+        
     # -- iterable protocol ----------------------------------------------------
     def __len__(self): return len(self.records)
     def __iter__(self): self.current_index = 0; return self
@@ -375,7 +375,6 @@ class UltrasoundDataLoader(DataLoader):
 
         # Optional: use the original human string; otherwise the generic template
         
-        self.prompt = ULTRA_PROMPT
 
         return img_path, ground_truth_json  # <image> , <answer string>
 # --------------------------------------------------------------------
