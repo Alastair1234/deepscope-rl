@@ -301,11 +301,11 @@ class GUIDataLoader(DataLoader):
 # 2 .  NEW ►  UltrasoundDataLoader
 # --------------------------------------------------------------------
 ULTRA_PROMPT = """
-You will be shown a freeze-frame from a point-of-care ultrasound scan.
+You will be shown a freeze-frame from a point-of-care echo scan.
 Your task is to determine the exact probe movement (position and rotation) needed to achieve an optimal parasternal long-axis (PLAX) view from this starting frame.
 
-The probe position movements typically range between -0.10 and +0.10 meters along each axis (x, y, z).
-Probe rotations typically range between -45 and +45 degrees along each axis (x, y, z).
+The probe position movements range between -10 and +10 along each axis (x, y, z) in centimeters.
+Probe rotations range between -45 and +45 degrees along each axis (x, y, z).
 
 Respond exactly in the following format:
 
@@ -313,23 +313,15 @@ Respond exactly in the following format:
 (Briefly mention if the probe needs to slide, roll, fan, rotate, or tilt, and clearly state direction.)
 </reasoning>
 <answer>
-{"position":{"x":XX,"y":YY,"z":ZZ},"rotation":{"x":RX,"y":RY,"z":RZ}}
+xt:yt:zt:xr:yr:zr
 </answer>
 
-Replace XX, YY, ZZ with your predicted position adjustments (in meters, from -0.10 to +0.10).
-Replace RX, RY, RZ with your predicted rotation adjustments (in degrees, from -45 to +45).
-
-Example:
-
-<reasoning>
-Slide slightly left and downward, rotate downward by around 30 degrees, roll about 10 degrees clockwise.
-</reasoning>
-<answer>
-{"position":{"x":-0.038,"y":-0.036,"z":0.004},"rotation":{"x":28,"y":-30,"z":10}}
-</answer>
+Replace xt, yt, zt with your predicted position adjustments (in centimeters, from -10 to +10, rounded to integers).
+Replace xr, yr, zr with your predicted rotation adjustments (in degrees, from -45 to +45, rounded to integers).
 
 Do not include any other text after </answer>.
 """
+
 
 class UltrasoundDataLoader(DataLoader):
     """
