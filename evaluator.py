@@ -605,55 +605,45 @@ class GUIEvaluator(RewardEvaluator):
 
 
 class UltrasoundEvaluator(RewardEvaluator):
-    KW = {"slide", "roll", "fan", "rotate", "tilt"}
-    num_reward_functions = 4
 
-    _float = r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?"
-    trans_re = re.compile(
-        rf'"position"\s*:\s*\{{[^}}]*"x"\s*:\s*({_float})[^}}]*"y"\s*:\s*({_float})[^}}]*"z"\s*:\s*({_float})[^}}]*\}}.*?'
-        rf'"rotation"\s*:\s*\{{[^}}]*"x"\s*:\s*({_float})[^}}]*"y"\s*:\s*({_float})[^}}]*"z"\s*:\s*({_float})',
-        re.DOTALL)
+    num_reward_functions = 3
 
-    xml_re = re.compile(r"^<reasoning>\n.*?\n</reasoning>\n<answer>\n\{.*?\}\n</answer>\n?$", re.DOTALL)
+    coord_re = re.compile(r"<answer>\s*(-?\d+):(-?\d+):(-?\d+):(-?\d+):(-?\d+):(-?\d+)\s*</answer>")
+    xml_re = re.compile(r"^<reasoning>\n.*?\n</reasoning>\n<answer>\n-?\d+:-?\d+:-?\d+:-?\d+:-?\d+:-?\d+\n</answer>\n?$", re.DOTALL)
 
     @staticmethod
     def _rot_error(pred_rot, true_rot):
         def quat(rx, ry, rz):
             rx, ry, rz = np.deg2rad([rx, ry, rz])
-            cx, sx = np.cos(rx / 2), np.sin(rx / 2)
-            cy, sy = np.cos(ry / 2), np.sin(ry / 2)
-            cz, sz = np.cos(rz / 2), np.sin(rz / 2)
-            qw = cx * cy * cz - sx * sy * sz
-            qx = sx * cy * cz + cx * sy * sz
-            qy = cx * sy * cz - sx * cy * sz
-            qz = cx * cy * sz + sx * sy * cz
-            return np.array([qw, qx, qy, qz])
+            return R.from_euler('xyz', [rx, ry, rz]).as_quat()
         qp, qt = quat(*pred_rot), quat(*true_rot)
         angle = 2 * np.arccos(min(1.0, abs(np.dot(qp, qt))))
         return np.degrees(angle)
 
     def _extract(self, txt):
-        match = self.trans_re.search(txt)
+        match = self.coord_re.search(txt)
         if not match:
             return None
-        vals = list(map(float, match.groups()))
-        return vals[:3], vals[3:]
+        vals = list(map(int, match.groups()))
+        translation = np.array(vals[:3]) / 100.0  # cm to meters
+        rotation = np.array(vals[3:])
+        return translation, rotation
 
     def translation_reward(self, err):
         if err <= 0.03:
-            return 3 * (1 - err / 0.03)  # close: +3 → 0
+            return 3 * (1 - err / 0.03)
         elif err <= 0.08:
-            return - (err - 0.03) / 0.05  # moderate: 0 → -1
+            return - (err - 0.03) / 0.05
         else:
-            return -min(2, 1 + (err - 0.08) / 0.05)  # far: gentle -1 → capped at -2
+            return -min(2, 1 + (err - 0.08) / 0.05)
 
     def rotation_reward(self, err):
         if err <= 10:
-            return 3 * (1 - err / 10)  # close: +3 → 0
+            return 3 * (1 - err / 10)
         elif err <= 25:
-            return - (err - 10) / 15  # moderate: 0 → -1
+            return - (err - 10) / 15
         else:
-            return -min(2, 1 + (err - 25) / 15)  # far: gentle -1 → capped at -2
+            return -min(2, 1 + (err - 25) / 15)
 
     def compute_rewards(self, prompts, completions, answers, device):
         rewards = []
@@ -662,10 +652,10 @@ class UltrasoundEvaluator(RewardEvaluator):
             truth = self._extract(answer)
 
             if pred is None or truth is None:
-                trans_r, rot_r = -2.0, -2.0  # penalize invalid responses gently
+                trans_r, rot_r = -2.0, -2.0
             else:
-                pred_pos, pred_rot = np.array(pred[0]), np.array(pred[1])
-                true_pos, true_rot = np.array(truth[0]), np.array(truth[1])
+                pred_pos, pred_rot = pred
+                true_pos, true_rot = truth
 
                 t_err = np.linalg.norm(pred_pos - true_pos)
                 r_err = self._rot_error(pred_rot, true_rot)
@@ -674,10 +664,10 @@ class UltrasoundEvaluator(RewardEvaluator):
                 rot_r = self.rotation_reward(r_err)
 
             reasoning = completion[0]["content"].split("<reasoning>")[-1].split("</reasoning>")[0].lower()
-            kw_bonus = 0.5 if any(kw in reasoning for kw in self.KW) else 0.0
+            
             xml_bonus = 0.5 if self.xml_re.match(completion[0]["content"].strip()) else 0.0
 
-            rewards.append([trans_r, rot_r, kw_bonus, xml_bonus])
+            rewards.append([trans_r, rot_r, xml_bonus])
 
         R = torch.tensor(rewards, device=device)
 
@@ -685,8 +675,7 @@ class UltrasoundEvaluator(RewardEvaluator):
             "reward": R.sum(dim=1).mean().item(),
             "translation": R[:, 0].mean().item(),
             "rotation": R[:, 1].mean().item(),
-            "keywords": R[:, 2].mean().item(),
-            "xml_format": R[:, 3].mean().item()
+            "xml_format": R[:, 2].mean().item(),
         }
         return R, metrics
 
@@ -696,7 +685,5 @@ class UltrasoundEvaluator(RewardEvaluator):
         return {
             "translation": reward_scores[0].item(),
             "rotation": reward_scores[1].item(),
-            "keywords": reward_scores[2].item(),
-            "xml_format": reward_scores[3].item(),
+            "xml_format": reward_scores[2].item(),
         }
-
